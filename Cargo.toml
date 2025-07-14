@@ -8,4 +8,11 @@ macroquad = "0.4"
 
 [[bin]]
 name = "rusty_dice"
-path = "src/main.rs" 
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
