@@ -21,6 +21,7 @@ pub struct PlayerAction {
 pub struct Game {
     pub player_count: u8,
     pub current_player: u8,
+    pub round_starter: u8,
     pub player_names: [String; MAX_PLAYERS],
     pub current_player_dice_count: [u8; MAX_PLAYERS],
     pub player_dice: [[u8; DICE_PER_PLAYER]; MAX_PLAYERS],
@@ -48,6 +49,7 @@ impl Game {
         Self {
             player_count: 4,
             current_player: 0, // Start with player 0
+            round_starter: 0, // Start with player 0 as round starter
             player_names,
             current_player_dice_count,
             player_dice: [[0; DICE_PER_PLAYER]; MAX_PLAYERS],
@@ -61,10 +63,48 @@ pub fn take_action(game: &Game, action: PlayerAction) -> Result<Game, String> {
     
     match action.action {
         Action::Call => {
-            if let Some(_last_bet) = new_game.bets.last() {
-                // TODO: Implement call logic - check if the bet was valid
-                // For now, just remove the last bet
-                new_game.bets.pop();
+            if let Some(last_bet) = new_game.bets.last() {
+                let (betting_player, bet_dice_count, bet_face_value) = last_bet;
+                
+                // Count all dice across all players that match the bet face value
+                let mut total_matching_dice = 0;
+                for player in 0..new_game.player_count as usize {
+                    let dice_count = new_game.current_player_dice_count[player] as usize;
+                    for die in 0..dice_count {
+                        if new_game.player_dice[player][die] == *bet_face_value {
+                            total_matching_dice += 1;
+                        }
+                    }
+                }
+                
+                // Determine if the bet was valid (dice count >= bet)
+                let bet_was_valid = total_matching_dice >= *bet_dice_count as usize;
+                
+                // Determine who loses a die
+                let losing_player = if bet_was_valid {
+                    // Bet was valid, caller loses a die
+                    new_game.current_player
+                } else {
+                    // Bet was invalid, betting player loses a die
+                    *betting_player
+                };
+                
+                // Make the losing player lose a die
+                if new_game.current_player_dice_count[losing_player as usize] > 0 {
+                    new_game.current_player_dice_count[losing_player as usize] -= 1;
+                }
+                
+                // Roll all dice for the next round
+                roll_all_dice(&mut new_game);
+                
+                // Clear the betting history for the next round
+                new_game.bets.clear();
+
+                // Advance the round starter to the next player
+                new_game.round_starter = (new_game.round_starter + 1) % new_game.player_count;
+                
+                // Set current player to the new round starter
+                new_game.current_player = new_game.round_starter;
             } else {
                 return Err("Cannot call when no bets have been made".to_string());
             }
@@ -90,8 +130,13 @@ pub fn take_action(game: &Game, action: PlayerAction) -> Result<Game, String> {
                 
                 // Add the bet to the betting history
                 new_game.bets.push((game.current_player as u8, dice_count, face_value));
-                // Advance to the next player
-                new_game.current_player = (new_game.current_player + 1) % new_game.player_count;
+                // Advance to the next player, skipping those with 0 dice
+                loop {
+                    new_game.current_player = (new_game.current_player + 1) % new_game.player_count;
+                    if new_game.current_player_dice_count[new_game.current_player as usize] > 0 {
+                        break; // Found a player with dice
+                    }
+                }
             } else {
                 return Err("Bet action requires dice count and face value".to_string());
             }
@@ -280,5 +325,206 @@ mod tests {
         
         let new_game = result.unwrap();
         assert_eq!(new_game.bets.len(), 0); // Bet was removed
+    }
+
+    #[test]
+    fn test_call_valid_bet_caller_loses_die() {
+        let mut game = create_test_game();
+        
+        // Set up dice so the bet will be valid (3 dice showing 5)
+        game.player_dice[0][0] = 5; // Player 1, die 1
+        game.player_dice[0][1] = 5; // Player 1, die 2
+        game.player_dice[1][0] = 5; // Player 2, die 1
+        game.player_dice[2][0] = 3; // Player 3, die 1 (not 5)
+        game.player_dice[3][0] = 5; // Player 4, die 1
+        
+        // Player 0 bets 3 dice showing 5
+        let bet = PlayerAction {
+            action: Action::Bet,
+            bet: Some((3, 5)),
+        };
+        game = take_action(&game, bet).unwrap();
+        
+        // Player 1 calls (current_player is now 1)
+        let call = PlayerAction {
+            action: Action::Call,
+            bet: None,
+        };
+        let result = take_action(&game, call);
+        assert!(result.is_ok());
+        
+        let new_game = result.unwrap();
+        // Bet was valid (4 dice showing 5 >= 3), so caller (player 1) loses a die
+        assert_eq!(new_game.current_player_dice_count[1], 4); // Player 1 lost a die
+        assert_eq!(new_game.current_player_dice_count[0], 5); // Player 0 unchanged
+        assert_eq!(new_game.bets.len(), 0); // Betting history cleared
+    }
+
+    #[test]
+    fn test_call_invalid_bet_betting_player_loses_die() {
+        let mut game = create_test_game();
+        
+        // Set up dice so the bet will be invalid (only 2 dice showing 5)
+        game.player_dice[0][0] = 5; // Player 1, die 1
+        game.player_dice[0][1] = 5; // Player 1, die 2
+        game.player_dice[1][0] = 3; // Player 2, die 1 (not 5)
+        game.player_dice[2][0] = 3; // Player 3, die 1 (not 5)
+        game.player_dice[3][0] = 3; // Player 4, die 1 (not 5)
+        
+        // Player 0 bets 3 dice showing 5
+        let bet = PlayerAction {
+            action: Action::Bet,
+            bet: Some((3, 5)),
+        };
+        game = take_action(&game, bet).unwrap();
+        
+        // Player 1 calls
+        let call = PlayerAction {
+            action: Action::Call,
+            bet: None,
+        };
+        let result = take_action(&game, call);
+        assert!(result.is_ok());
+        
+        let new_game = result.unwrap();
+        // Bet was invalid (2 dice showing 5 < 3), so betting player (player 0) loses a die
+        assert_eq!(new_game.current_player_dice_count[0], 4); // Player 0 lost a die
+        assert_eq!(new_game.current_player_dice_count[1], 5); // Player 1 unchanged
+        assert_eq!(new_game.bets.len(), 0); // Betting history cleared
+    }
+
+    #[test]
+    fn test_call_exact_match_bet_valid() {
+        let mut game = create_test_game();
+        
+        // Set up dice so exactly 3 dice show 5 (matching the bet exactly)
+        game.player_dice[0][0] = 5; // Player 1, die 1
+        game.player_dice[0][1] = 5; // Player 1, die 2
+        game.player_dice[1][0] = 5; // Player 2, die 1
+        game.player_dice[2][0] = 3; // Player 3, die 1 (not 5)
+        game.player_dice[3][0] = 3; // Player 4, die 1 (not 5)
+        
+        // Player 0 bets 3 dice showing 5
+        let bet = PlayerAction {
+            action: Action::Bet,
+            bet: Some((3, 5)),
+        };
+        game = take_action(&game, bet).unwrap();
+        
+        // Player 1 calls
+        let call = PlayerAction {
+            action: Action::Call,
+            bet: None,
+        };
+        let result = take_action(&game, call);
+        assert!(result.is_ok());
+        
+        let new_game = result.unwrap();
+        // Bet was valid (3 dice showing 5 >= 3), so caller (player 1) loses a die
+        assert_eq!(new_game.current_player_dice_count[1], 4); // Player 1 lost a die
+        assert_eq!(new_game.current_player_dice_count[0], 5); // Player 0 unchanged
+    }
+
+    #[test]
+    fn test_call_clears_betting_history() {
+        let mut game = create_test_game();
+        
+        // Make multiple bets
+        let bet1 = PlayerAction {
+            action: Action::Bet,
+            bet: Some((2, 3)),
+        };
+        game = take_action(&game, bet1).unwrap();
+        
+        let bet2 = PlayerAction {
+            action: Action::Bet,
+            bet: Some((3, 4)),
+        };
+        game = take_action(&game, bet2).unwrap();
+        
+        let bet3 = PlayerAction {
+            action: Action::Bet,
+            bet: Some((4, 5)),
+        };
+        game = take_action(&game, bet3).unwrap();
+        
+        assert_eq!(game.bets.len(), 3); // Three bets in history
+        
+        // Call the last bet
+        let call = PlayerAction {
+            action: Action::Call,
+            bet: None,
+        };
+        let result = take_action(&game, call);
+        assert!(result.is_ok());
+        
+        let new_game = result.unwrap();
+        assert_eq!(new_game.bets.len(), 0); // All betting history cleared
+    }
+
+    #[test]
+    fn test_call_with_player_having_zero_dice() {
+        let mut game = create_test_game();
+        
+        // Set player 0 to have 0 dice
+        game.current_player_dice_count[0] = 0;
+        
+        // Player 1 bets
+        let bet = PlayerAction {
+            action: Action::Bet,
+            bet: Some((3, 5)),
+        };
+        game = take_action(&game, bet).unwrap();
+        
+        // Player 2 calls
+        let call = PlayerAction {
+            action: Action::Call,
+            bet: None,
+        };
+        let result = take_action(&game, call);
+        assert!(result.is_ok());
+        
+        let new_game = result.unwrap();
+        // Player 0 should still have 0 dice (no negative dice)
+        assert_eq!(new_game.current_player_dice_count[0], 0);
+    }
+
+    #[test]
+    fn test_round_starter_increments_after_call() {
+        let mut game = create_test_game();
+        
+        // Verify initial state
+        assert_eq!(game.round_starter, 0);
+        assert_eq!(game.current_player, 0);
+        
+        // Player 0 bets
+        let bet = PlayerAction {
+            action: Action::Bet,
+            bet: Some((3, 5)),
+        };
+        game = take_action(&game, bet).unwrap();
+        
+        // Verify turn advanced but round starter unchanged
+        assert_eq!(game.round_starter, 0);
+        assert_eq!(game.current_player, 1);
+        
+        // Player 1 calls
+        let call = PlayerAction {
+            action: Action::Call,
+            bet: None,
+        };
+        let result = take_action(&game, call);
+        assert!(result.is_ok());
+        
+        let new_game = result.unwrap();
+        
+        // Round starter should increment
+        assert_eq!(new_game.round_starter, 1);
+        
+        // Current player should be set to new round starter
+        assert_eq!(new_game.current_player, 1);
+        
+        // Betting history should be cleared
+        assert_eq!(new_game.bets.len(), 0);
     }
 }
