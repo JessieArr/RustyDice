@@ -5,11 +5,25 @@ use crate::dice::roll_dice;
 const MAX_PLAYERS: usize = 8;
 const DICE_PER_PLAYER: usize = 5;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Action {
+    Bet,
+    Call,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlayerAction {
+    pub action: Action,
+    pub bet: Option<(u8, u8)> // (dice_count, face_value)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Game {
     pub player_count: u8,
     pub player_names: [String; MAX_PLAYERS],
     pub current_player_dice_count: [u8; MAX_PLAYERS],
     pub player_dice: [[u8; DICE_PER_PLAYER]; MAX_PLAYERS],
+    pub bets: Vec<(u8, u8, u8)>, // (player_index, dice_count, face_value)
 }
 
 pub fn roll_all_dice(game: &mut Game) {
@@ -35,6 +49,29 @@ impl Game {
             player_names,
             current_player_dice_count,
             player_dice: [[0; DICE_PER_PLAYER]; MAX_PLAYERS],
+            bets: Vec::new(), // Initialize bets array
         }
     }
+}
+
+pub fn take_action(game: &Game, player_index: usize, action: PlayerAction) -> Game {
+    let mut new_game = game.clone();
+    
+    match action.action {
+        Action::Call => {
+            if let Some(_last_bet) = new_game.bets.last() {
+                // TODO: Implement call logic - check if the bet was valid
+                // For now, just remove the last bet
+                new_game.bets.pop();
+            }
+        }
+        Action::Bet => {
+            if let Some((dice_count, face_value)) = action.bet {
+                // Add the bet to the betting history
+                new_game.bets.push((player_index as u8, dice_count, face_value));
+            }
+        }
+    }
+    
+    new_game
 }
