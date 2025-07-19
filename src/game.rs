@@ -20,6 +20,7 @@ pub struct PlayerAction {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Game {
     pub player_count: u8,
+    pub current_player: u8,
     pub player_names: [String; MAX_PLAYERS],
     pub current_player_dice_count: [u8; MAX_PLAYERS],
     pub player_dice: [[u8; DICE_PER_PLAYER]; MAX_PLAYERS],
@@ -46,6 +47,7 @@ impl Game {
         
         Self {
             player_count: 4,
+            current_player: 0, // Start with player 0
             player_names,
             current_player_dice_count,
             player_dice: [[0; DICE_PER_PLAYER]; MAX_PLAYERS],
@@ -88,6 +90,8 @@ pub fn take_action(game: &Game, player_index: usize, action: PlayerAction) -> Re
                 
                 // Add the bet to the betting history
                 new_game.bets.push((player_index as u8, dice_count, face_value));
+                // Advance to the next player
+                new_game.current_player = (new_game.current_player + 1) % new_game.player_count;
             } else {
                 return Err("Bet action requires dice count and face value".to_string());
             }
@@ -228,6 +232,7 @@ mod tests {
         let new_game = result.unwrap();
         assert_eq!(new_game.bets.len(), 1);
         assert_eq!(new_game.bets[0], (0, 3, 5));
+        assert_eq!(new_game.current_player, 1); // Current player should increment
     }
 
     #[test]
