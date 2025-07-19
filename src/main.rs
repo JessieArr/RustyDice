@@ -2,11 +2,16 @@ use macroquad::prelude::*;
 
 mod dice;
 use dice::{roll_dice, draw_dice_dots};
+mod game;
+use game::{Game, GameState, Player};
 
 #[macroquad::main("Rusty Dice - Hello World")]
 async fn main() {
     let mut current_dice_value = 6;
     let mut last_roll_time = 0.0;
+
+    // Example: create a game with 2 players
+    let mut game = Game::new(2);
 
     loop {
         clear_background(WHITE);
