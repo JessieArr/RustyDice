@@ -5,7 +5,7 @@ use dice::{draw_dice_dots};
 mod game;
 use game::{Game, roll_all_dice, take_action, Action, PlayerAction};
 
-#[macroquad::main("Rusty Dice - Hello World")]
+#[macroquad::main("Rusty Dice")]
 async fn main() {
     let mut selected_dice_count = 1;
     let mut selected_face_value = 1;
@@ -29,7 +29,7 @@ async fn main() {
                     action: Action::Call,
                     bet: None,
                 };
-                match take_action(&game, 0, call_action) {
+                match take_action(&game, call_action) {
                     Ok(new_game) => game = new_game,
                     Err(e) => println!("Call error: {}", e),
                 }
@@ -42,7 +42,7 @@ async fn main() {
                     action: Action::Bet,
                     bet: Some((selected_dice_count, selected_face_value)),
                 };
-                match take_action(&game, 0, bet_action) {
+                match take_action(&game, bet_action) {
                     Ok(new_game) => game = new_game,
                     Err(e) => println!("Bet error: {}", e),
                 }
