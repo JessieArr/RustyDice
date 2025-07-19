@@ -54,7 +54,7 @@ impl Game {
     }
 }
 
-pub fn take_action(game: &Game, player_index: usize, action: PlayerAction) -> Game {
+pub fn take_action(game: &Game, player_index: usize, action: PlayerAction) -> Result<Game, String> {
     let mut new_game = game.clone();
     
     match action.action {
@@ -63,15 +63,217 @@ pub fn take_action(game: &Game, player_index: usize, action: PlayerAction) -> Ga
                 // TODO: Implement call logic - check if the bet was valid
                 // For now, just remove the last bet
                 new_game.bets.pop();
+            } else {
+                return Err("Cannot call when no bets have been made".to_string());
             }
         }
         Action::Bet => {
             if let Some((dice_count, face_value)) = action.bet {
+                // Validate bet parameters
+                if face_value < 1 || face_value > 6 {
+                    return Err("Face value must be between 1 and 6".to_string());
+                }
+                if dice_count == 0 {
+                    return Err("Cannot bet on 0 dice".to_string());
+                }
+                
+                // Check if this bet is higher than the previous bet
+                if let Some(last_bet) = new_game.bets.last() {
+                    let (_, last_dice_count, last_face_value) = last_bet;
+                    if dice_count < *last_dice_count || 
+                       (dice_count == *last_dice_count && face_value <= *last_face_value) {
+                        return Err("New bet must be higher than the previous bet".to_string());
+                    }
+                }
+                
                 // Add the bet to the betting history
                 new_game.bets.push((player_index as u8, dice_count, face_value));
+            } else {
+                return Err("Bet action requires dice count and face value".to_string());
             }
         }
     }
     
-    new_game
+    Ok(new_game)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create_test_game() -> Game {
+        Game::new()
+    }
+
+    #[test]
+    fn test_call_without_bets_returns_error() {
+        let game = create_test_game();
+        let call_action = PlayerAction {
+            action: Action::Call,
+            bet: None,
+        };
+        
+        let result = take_action(&game, 0, call_action);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Cannot call when no bets have been made");
+    }
+
+    #[test]
+    fn test_bet_with_invalid_face_value_returns_error() {
+        let game = create_test_game();
+        let invalid_bet = PlayerAction {
+            action: Action::Bet,
+            bet: Some((3, 7)), // Face value > 6
+        };
+        
+        let result = take_action(&game, 0, invalid_bet);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Face value must be between 1 and 6");
+    }
+
+    #[test]
+    fn test_bet_with_zero_face_value_returns_error() {
+        let game = create_test_game();
+        let invalid_bet = PlayerAction {
+            action: Action::Bet,
+            bet: Some((3, 0)), // Face value = 0
+        };
+        
+        let result = take_action(&game, 0, invalid_bet);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Face value must be between 1 and 6");
+    }
+
+    #[test]
+    fn test_bet_with_zero_dice_returns_error() {
+        let game = create_test_game();
+        let invalid_bet = PlayerAction {
+            action: Action::Bet,
+            bet: Some((0, 5)), // 0 dice
+        };
+        
+        let result = take_action(&game, 0, invalid_bet);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Cannot bet on 0 dice");
+    }
+
+    #[test]
+    fn test_bet_without_data_returns_error() {
+        let game = create_test_game();
+        let invalid_bet = PlayerAction {
+            action: Action::Bet,
+            bet: None, // No bet data
+        };
+        
+        let result = take_action(&game, 0, invalid_bet);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Bet action requires dice count and face value");
+    }
+
+    #[test]
+    fn test_bet_lower_than_previous_returns_error() {
+        let mut game = create_test_game();
+        
+        // Make first bet
+        let first_bet = PlayerAction {
+            action: Action::Bet,
+            bet: Some((3, 5)),
+        };
+        game = take_action(&game, 0, first_bet).unwrap();
+        
+        // Try to make lower bet
+        let lower_bet = PlayerAction {
+            action: Action::Bet,
+            bet: Some((2, 5)), // Fewer dice
+        };
+        
+        let result = take_action(&game, 1, lower_bet);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "New bet must be higher than the previous bet");
+    }
+
+    #[test]
+    fn test_bet_same_dice_lower_face_returns_error() {
+        let mut game = create_test_game();
+        
+        // Make first bet
+        let first_bet = PlayerAction {
+            action: Action::Bet,
+            bet: Some((3, 5)),
+        };
+        game = take_action(&game, 0, first_bet).unwrap();
+        
+        // Try to make bet with same dice but lower face
+        let lower_bet = PlayerAction {
+            action: Action::Bet,
+            bet: Some((3, 4)), // Same dice, lower face
+        };
+        
+        let result = take_action(&game, 1, lower_bet);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "New bet must be higher than the previous bet");
+    }
+
+    #[test]
+    fn test_valid_bet_succeeds() {
+        let game = create_test_game();
+        let valid_bet = PlayerAction {
+            action: Action::Bet,
+            bet: Some((3, 5)),
+        };
+        
+        let result = take_action(&game, 0, valid_bet);
+        assert!(result.is_ok());
+        
+        let new_game = result.unwrap();
+        assert_eq!(new_game.bets.len(), 1);
+        assert_eq!(new_game.bets[0], (0, 3, 5));
+    }
+
+    #[test]
+    fn test_valid_bet_progression_succeeds() {
+        let mut game = create_test_game();
+        
+        // First bet
+        let first_bet = PlayerAction {
+            action: Action::Bet,
+            bet: Some((3, 5)),
+        };
+        game = take_action(&game, 0, first_bet).unwrap();
+        
+        // Higher bet (more dice)
+        let higher_bet = PlayerAction {
+            action: Action::Bet,
+            bet: Some((4, 5)), // More dice, same face
+        };
+        let result = take_action(&game, 1, higher_bet);
+        assert!(result.is_ok());
+        
+        let new_game = result.unwrap();
+        assert_eq!(new_game.bets.len(), 2);
+        assert_eq!(new_game.bets[1], (1, 4, 5));
+    }
+
+    #[test]
+    fn test_valid_call_succeeds() {
+        let mut game = create_test_game();
+        
+        // Make a bet first
+        let bet = PlayerAction {
+            action: Action::Bet,
+            bet: Some((3, 5)),
+        };
+        game = take_action(&game, 0, bet).unwrap();
+        
+        // Call the bet
+        let call = PlayerAction {
+            action: Action::Call,
+            bet: None,
+        };
+        let result = take_action(&game, 1, call);
+        assert!(result.is_ok());
+        
+        let new_game = result.unwrap();
+        assert_eq!(new_game.bets.len(), 0); // Bet was removed
+    }
 }
