@@ -17,6 +17,54 @@ async fn main() {
     loop {
         clear_background(WHITE);
 
+        // Check if there's a winner
+        if let Some(winner_id) = game.winner {
+            // Display winner screen
+            draw_text(
+                "Game Over!",
+                screen_width() / 2.0 - 80.0,
+                screen_height() / 2.0 - 100.0,
+                50.0,
+                BLACK,
+            );
+            
+            draw_text(
+                &format!("Winner: {}", game.player_names[winner_id as usize]),
+                screen_width() / 2.0 - 120.0,
+                screen_height() / 2.0 - 40.0,
+                30.0,
+                GREEN,
+            );
+            
+            // Restart button
+            let restart_button_rect = Rect::new(screen_width() / 2.0 - 80.0, screen_height() / 2.0 + 20.0, 160.0, 50.0);
+            draw_rectangle(restart_button_rect.x, restart_button_rect.y, restart_button_rect.w, restart_button_rect.h, BLUE);
+            draw_text(
+                "Restart Game",
+                screen_width() / 2.0 - 60.0,
+                screen_height() / 2.0 + 35.0,
+                24.0,
+                WHITE,
+            );
+            
+            // Handle restart button click
+            if is_mouse_button_pressed(MouseButton::Left) {
+                let (mouse_x, mouse_y) = mouse_position();
+                let mouse_pos = Vec2::new(mouse_x, mouse_y);
+                
+                if restart_button_rect.contains(mouse_pos) {
+                    // Reset the game
+                    game = Game::new();
+                    roll_all_dice(&mut game);
+                    selected_dice_count = 1;
+                    selected_face_value = 1;
+                }
+            }
+            
+            next_frame().await;
+            continue; // Skip normal game logic when winner is declared
+        }
+
         // Handle mouse input for UI controls
         if is_mouse_button_pressed(MouseButton::Left) {
             let (mouse_x, mouse_y) = mouse_position();

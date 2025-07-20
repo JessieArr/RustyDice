@@ -22,6 +22,7 @@ pub struct Game {
     pub player_count: u8,
     pub current_player: u8,
     pub round_starter: u8,
+    pub winner: Option<u8>,
     pub player_names: [String; MAX_PLAYERS],
     pub current_player_dice_count: [u8; MAX_PLAYERS],
     pub player_dice: [[u8; DICE_PER_PLAYER]; MAX_PLAYERS],
@@ -50,6 +51,7 @@ impl Game {
             player_count: 4,
             current_player: 0, // Start with player 0
             round_starter: 0, // Start with player 0 as round starter
+            winner: None,
             player_names,
             current_player_dice_count,
             player_dice: [[0; DICE_PER_PLAYER]; MAX_PLAYERS],
@@ -92,6 +94,21 @@ pub fn take_action(game: &Game, action: PlayerAction) -> Result<Game, String> {
                 // Make the losing player lose a die
                 if new_game.current_player_dice_count[losing_player as usize] > 0 {
                     new_game.current_player_dice_count[losing_player as usize] -= 1;
+                    
+                    // Check if only one player has dice left
+                    let mut players_with_dice = 0;
+                    let mut last_player_with_dice = 0;
+                    for player in 0..new_game.player_count as usize {
+                        if new_game.current_player_dice_count[player] > 0 {
+                            players_with_dice += 1;
+                            last_player_with_dice = player;
+                        }
+                    }
+                    
+                    // If only one player has dice, they win
+                    if players_with_dice == 1 {
+                        new_game.winner = Some(last_player_with_dice as u8);
+                    }
                 }
                 
                 // Roll all dice for the next round
