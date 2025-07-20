@@ -544,4 +544,107 @@ mod tests {
         // Betting history should be cleared
         assert_eq!(new_game.bets.len(), 0);
     }
+
+    #[test]
+    fn test_winner_declared_when_one_player_remains() {
+        let mut game = create_test_game();
+        
+        // Set up scenario where only one player will have dice after a call
+        // Player 0: 1 die, Player 1: 1 die, Player 2: 0 dice, Player 3: 0 dice
+        game.current_player_dice_count[0] = 1;
+        game.current_player_dice_count[1] = 1;
+        game.current_player_dice_count[2] = 0;
+        game.current_player_dice_count[3] = 0;
+        
+        // Set up dice so the bet will be invalid (no dice showing 5)
+        game.player_dice[0][0] = 3; // Player 1's die is not 5
+        game.player_dice[1][0] = 3; // Player 2's die is not 5
+        
+        // Player 0 bets 1 dice showing 5
+        let bet = PlayerAction {
+            action: Action::Bet,
+            bet: Some((1, 5)),
+        };
+        game = take_action(&game, bet).unwrap();
+        
+        // Player 1 calls (current_player is now 1)
+        let call = PlayerAction {
+            action: Action::Call,
+            bet: None,
+        };
+        let result = take_action(&game, call);
+        assert!(result.is_ok());
+        
+        let new_game = result.unwrap();
+        
+        // Bet was invalid, so betting player (player 0) loses their last die
+        assert_eq!(new_game.current_player_dice_count[0], 0);
+        
+        // Check which player actually has dice remaining
+        let mut players_with_dice = Vec::new();
+        for player in 0..new_game.player_count as usize {
+            if new_game.current_player_dice_count[player] > 0 {
+                players_with_dice.push(player);
+            }
+        }
+        
+        // Should be exactly one player with dice (Player 1)
+        assert_eq!(players_with_dice.len(), 1);
+        let winner = players_with_dice[0];
+        assert_eq!(winner, 1); // Player 1 should be the winner
+        
+        // That player should be declared the winner
+        assert_eq!(new_game.winner, Some(winner as u8));
+        
+        // Verify other players have 0 dice
+        assert_eq!(new_game.current_player_dice_count[0], 0);
+        assert_eq!(new_game.current_player_dice_count[2], 0);
+        assert_eq!(new_game.current_player_dice_count[3], 0);
+    }
+
+    #[test]
+    fn test_no_winner_when_multiple_players_have_dice() {
+        let mut game = create_test_game();
+        
+        // Set up scenario where multiple players have dice
+        // Player 0: 2 dice, Player 1: 1 die, Player 2: 0 dice, Player 3: 1 die
+        game.current_player_dice_count[0] = 2;
+        game.current_player_dice_count[1] = 1;
+        game.current_player_dice_count[2] = 0;
+        game.current_player_dice_count[3] = 1;
+        
+        // Set up dice so the bet will be invalid
+        game.player_dice[0][0] = 3; // Not 5
+        game.player_dice[0][1] = 3; // Not 5
+        game.player_dice[1][0] = 3; // Not 5
+        game.player_dice[3][0] = 3; // Not 5
+        
+        // Player 0 bets 1 dice showing 5
+        let bet = PlayerAction {
+            action: Action::Bet,
+            bet: Some((1, 5)),
+        };
+        game = take_action(&game, bet).unwrap();
+        
+        // Player 1 calls
+        let call = PlayerAction {
+            action: Action::Call,
+            bet: None,
+        };
+        let result = take_action(&game, call);
+        assert!(result.is_ok());
+        
+        let new_game = result.unwrap();
+        
+        // Bet was invalid, so betting player (player 0) loses a die
+        assert_eq!(new_game.current_player_dice_count[0], 1); // Lost one die
+        
+        // Multiple players still have dice, so no winner should be declared
+        assert_eq!(new_game.winner, None);
+        
+        // Verify other players unchanged
+        assert_eq!(new_game.current_player_dice_count[1], 1);
+        assert_eq!(new_game.current_player_dice_count[2], 0);
+        assert_eq!(new_game.current_player_dice_count[3], 1);
+    }
 }
