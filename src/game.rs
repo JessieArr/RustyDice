@@ -60,7 +60,7 @@ impl Game {
     }
 }
 
-pub fn take_action(game: &Game, action: PlayerAction) -> Result<Game, String> {
+pub fn take_action(game: &Game, action: &PlayerAction) -> Result<Game, String> {
     let mut new_game = game.clone();
     
     match action.action {
@@ -179,7 +179,7 @@ mod tests {
             bet: None,
         };
         
-        let result = take_action(&game, call_action);
+        let result = take_action(&game, &call_action);
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "Cannot call when no bets have been made");
     }
@@ -192,7 +192,7 @@ mod tests {
             bet: Some((3, 7)), // Face value > 6
         };
         
-        let result = take_action(&game, invalid_bet);
+        let result = take_action(&game, &invalid_bet);
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "Face value must be between 1 and 6");
     }
@@ -205,7 +205,7 @@ mod tests {
             bet: Some((3, 0)), // Face value = 0
         };
         
-        let result = take_action(&game, invalid_bet);
+        let result = take_action(&game, &invalid_bet);
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "Face value must be between 1 and 6");
     }
@@ -218,7 +218,7 @@ mod tests {
             bet: Some((0, 5)), // 0 dice
         };
         
-        let result = take_action(&game, invalid_bet);
+        let result = take_action(&game, &invalid_bet);
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "Cannot bet on 0 dice");
     }
@@ -231,7 +231,7 @@ mod tests {
             bet: None, // No bet data
         };
         
-        let result = take_action(&game, invalid_bet);
+        let result = take_action(&game, &invalid_bet);
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "Bet action requires dice count and face value");
     }
@@ -245,7 +245,7 @@ mod tests {
             action: Action::Bet,
             bet: Some((3, 5)),
         };
-        game = take_action(&game, first_bet).unwrap();
+        game = take_action(&game, &first_bet).unwrap();
         
         // Try to make lower bet
         let lower_bet = PlayerAction {
@@ -253,7 +253,7 @@ mod tests {
             bet: Some((2, 5)), // Fewer dice
         };
         
-        let result = take_action(&game, lower_bet);
+        let result = take_action(&game, &lower_bet);
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "New bet must be higher than the previous bet");
     }
@@ -267,7 +267,7 @@ mod tests {
             action: Action::Bet,
             bet: Some((3, 5)),
         };
-        game = take_action(&game, first_bet).unwrap();
+        game = take_action(&game, &first_bet).unwrap();
         
         // Try to make bet with same dice but lower face
         let lower_bet = PlayerAction {
@@ -275,7 +275,7 @@ mod tests {
             bet: Some((3, 4)), // Same dice, lower face
         };
         
-        let result = take_action(&game, lower_bet);
+        let result = take_action(&game, &lower_bet);
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "New bet must be higher than the previous bet");
     }
@@ -288,7 +288,7 @@ mod tests {
             bet: Some((3, 5)),
         };
         
-        let result = take_action(&game, valid_bet);
+        let result = take_action(&game, &valid_bet);
         assert!(result.is_ok());
         
         let new_game = result.unwrap();
@@ -306,14 +306,14 @@ mod tests {
             action: Action::Bet,
             bet: Some((3, 5)),
         };
-        game = take_action(&game, first_bet).unwrap();
+        game = take_action(&game, &first_bet).unwrap();
         
         // Higher bet (more dice)
         let higher_bet = PlayerAction {
             action: Action::Bet,
             bet: Some((4, 5)), // More dice, same face
         };
-        let result = take_action(&game, higher_bet);
+        let result = take_action(&game, &higher_bet);
         assert!(result.is_ok());
         
         let new_game = result.unwrap();
@@ -330,14 +330,14 @@ mod tests {
             action: Action::Bet,
             bet: Some((3, 5)),
         };
-        game = take_action(&game, bet).unwrap();
+        game = take_action(&game, &bet).unwrap();
         
         // Call the bet
         let call = PlayerAction {
             action: Action::Call,
             bet: None,
         };
-        let result = take_action(&game, call);
+        let result = take_action(&game, &call);
         assert!(result.is_ok());
         
         let new_game = result.unwrap();
@@ -360,14 +360,14 @@ mod tests {
             action: Action::Bet,
             bet: Some((3, 5)),
         };
-        game = take_action(&game, bet).unwrap();
+        game = take_action(&game, &bet).unwrap();
         
         // Player 1 calls (current_player is now 1)
         let call = PlayerAction {
             action: Action::Call,
             bet: None,
         };
-        let result = take_action(&game, call);
+        let result = take_action(&game, &call);
         assert!(result.is_ok());
         
         let new_game = result.unwrap();
@@ -393,14 +393,14 @@ mod tests {
             action: Action::Bet,
             bet: Some((3, 5)),
         };
-        game = take_action(&game, bet).unwrap();
+        game = take_action(&game, &bet).unwrap();
         
         // Player 1 calls
         let call = PlayerAction {
             action: Action::Call,
             bet: None,
         };
-        let result = take_action(&game, call);
+        let result = take_action(&game, &call);
         assert!(result.is_ok());
         
         let new_game = result.unwrap();
@@ -426,14 +426,14 @@ mod tests {
             action: Action::Bet,
             bet: Some((3, 5)),
         };
-        game = take_action(&game, bet).unwrap();
+        game = take_action(&game, &bet).unwrap();
         
         // Player 1 calls
         let call = PlayerAction {
             action: Action::Call,
             bet: None,
         };
-        let result = take_action(&game, call);
+        let result = take_action(&game, &call);
         assert!(result.is_ok());
         
         let new_game = result.unwrap();
@@ -451,19 +451,19 @@ mod tests {
             action: Action::Bet,
             bet: Some((2, 3)),
         };
-        game = take_action(&game, bet1).unwrap();
+        game = take_action(&game, &bet1).unwrap();
         
         let bet2 = PlayerAction {
             action: Action::Bet,
             bet: Some((3, 4)),
         };
-        game = take_action(&game, bet2).unwrap();
+        game = take_action(&game, &bet2).unwrap();
         
         let bet3 = PlayerAction {
             action: Action::Bet,
             bet: Some((4, 5)),
         };
-        game = take_action(&game, bet3).unwrap();
+        game = take_action(&game, &bet3).unwrap();
         
         assert_eq!(game.bets.len(), 3); // Three bets in history
         
@@ -472,7 +472,7 @@ mod tests {
             action: Action::Call,
             bet: None,
         };
-        let result = take_action(&game, call);
+        let result = take_action(&game, &call);
         assert!(result.is_ok());
         
         let new_game = result.unwrap();
@@ -491,14 +491,14 @@ mod tests {
             action: Action::Bet,
             bet: Some((3, 5)),
         };
-        game = take_action(&game, bet).unwrap();
+        game = take_action(&game, &bet).unwrap();
         
         // Player 2 calls
         let call = PlayerAction {
             action: Action::Call,
             bet: None,
         };
-        let result = take_action(&game, call);
+        let result = take_action(&game, &call);
         assert!(result.is_ok());
         
         let new_game = result.unwrap();
@@ -519,7 +519,7 @@ mod tests {
             action: Action::Bet,
             bet: Some((3, 5)),
         };
-        game = take_action(&game, bet).unwrap();
+        game = take_action(&game, &bet).unwrap();
         
         // Verify turn advanced but round starter unchanged
         assert_eq!(game.round_starter, 0);
@@ -530,7 +530,7 @@ mod tests {
             action: Action::Call,
             bet: None,
         };
-        let result = take_action(&game, call);
+        let result = take_action(&game, &call);
         assert!(result.is_ok());
         
         let new_game = result.unwrap();
@@ -565,14 +565,14 @@ mod tests {
             action: Action::Bet,
             bet: Some((1, 5)),
         };
-        game = take_action(&game, bet).unwrap();
+        game = take_action(&game, &bet).unwrap();
         
         // Player 1 calls (current_player is now 1)
         let call = PlayerAction {
             action: Action::Call,
             bet: None,
         };
-        let result = take_action(&game, call);
+        let result = take_action(&game, &call);
         assert!(result.is_ok());
         
         let new_game = result.unwrap();
@@ -624,14 +624,14 @@ mod tests {
             action: Action::Bet,
             bet: Some((1, 5)),
         };
-        game = take_action(&game, bet).unwrap();
+        game = take_action(&game, &bet).unwrap();
         
         // Player 1 calls
         let call = PlayerAction {
             action: Action::Call,
             bet: None,
         };
-        let result = take_action(&game, call);
+        let result = take_action(&game, &call);
         assert!(result.is_ok());
         
         let new_game = result.unwrap();

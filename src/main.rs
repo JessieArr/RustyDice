@@ -5,6 +5,8 @@ mod game;
 use game::{Game, take_action, roll_all_dice};
 mod render_game;
 use render_game::{render_game, handle_restart_click, RenderState};
+mod ai;
+use ai::ai_decide_action;
 
 #[macroquad::main("Rusty Dice")]
 async fn main() {
@@ -16,12 +18,56 @@ async fn main() {
     let mut render_state = RenderState::new();
 
     loop {
-        // Render the game and get any player action
-        if let Some(action) = render_game(&game, &mut render_state) {
-            // Handle the player action
-            match take_action(&game, action) {
-                Ok(new_game) => game = new_game,
-                Err(e) => println!("Action error: {}", e),
+        // Always render the game
+        let action = render_game(&game, &mut render_state);
+
+        // Only allow human (player 0) to act when it's their turn and the game is not over
+        if game.current_player == 0 && game.winner.is_none() {
+            if let Some(action) = action {
+                match take_action(&game, &action) {
+                    Ok(new_game) => {
+                        match action.action {
+                            game::Action::Bet => {
+                                if let Some((_, dice_count, face_value)) = new_game.bets.last() {
+                                    render_state.selected_dice_count = *dice_count;
+                                    render_state.selected_face_value = *face_value;
+                                }
+                            }
+                            game::Action::Call => {
+                                render_state.selected_dice_count = 1;
+                                render_state.selected_face_value = 1;
+                            }
+                        }
+                        game = new_game;
+                    }
+                    Err(e) => println!("Action error: {}", e),
+                }
+            }
+        } else if game.winner.is_none() {
+            // AI takes actions for players 1-3
+            while game.current_player != 0 && game.winner.is_none() {
+                let ai_action = ai_decide_action(&game);
+                match take_action(&game, &ai_action) {
+                    Ok(new_game) => {
+                        match ai_action.action {
+                            game::Action::Bet => {
+                                if let Some((_, dice_count, face_value)) = new_game.bets.last() {
+                                    render_state.selected_dice_count = *dice_count;
+                                    render_state.selected_face_value = *face_value;
+                                }
+                            }
+                            game::Action::Call => {
+                                render_state.selected_dice_count = 1;
+                                render_state.selected_face_value = 1;
+                            }
+                        }
+                        game = new_game;
+                    }
+                    Err(e) => {
+                        println!("AI error: {}", e);
+                        break;
+                    }
+                }
             }
         }
 
