@@ -162,10 +162,11 @@ fn render_game_ui(game: &Game, render_state: &RenderState) {
 
     // Draw betting history
     if !game.bets.is_empty() {
+        let bet_list_offset = screen_height() - 600.0;
         draw_text(
             "Betting History:",
             50.0,
-            screen_height() - 200.0,
+            bet_list_offset,
             20.0,
             BLACK,
         );
@@ -175,7 +176,7 @@ fn render_game_ui(game: &Game, render_state: &RenderState) {
             draw_text(
                 &format!("Player {}: {} dice showing {}", player + 1, dice_count, face_value),
                 50.0,
-                screen_height() - 180.0 + (i as f32 * 20.0),
+                bet_list_offset + ((1.0 + i as f32) * 20.0),
                 16.0,
                 DARKGRAY,
             );
