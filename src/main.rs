@@ -8,7 +8,17 @@ use render_game::{render_game, handle_restart_click, RenderState};
 mod ai;
 use ai::ai_decide_action;
 
-#[macroquad::main("Rusty Dice")]
+fn window_conf() -> Conf {
+    Conf {
+        window_title: "Rusty Dice".to_owned(),
+        window_width: 1200,
+        window_height: 800,
+        window_resizable: true,
+        ..Default::default()
+    }
+}
+
+#[macroquad::main(window_conf)]
 async fn main() {
     // Create a game with 4 players and roll dice automatically
     let mut game = Game::new();
