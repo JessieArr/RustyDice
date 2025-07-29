@@ -26,6 +26,9 @@ async fn main() {
 
     // Create render state for UI controls
     let mut render_state = RenderState::new();
+    
+    // Track timing for AI actions
+    let mut last_ai_action_time = std::time::Instant::now();
 
     loop {
         // Always render the game
@@ -56,27 +59,37 @@ async fn main() {
         } else if game.winner.is_none() {
             // AI takes actions for players 1-3
             while game.current_player != 0 && game.winner.is_none() {
-                let ai_action = ai_decide_action(&game);
-                match take_action(&game, &ai_action) {
-                    Ok(new_game) => {
-                        match ai_action.action {
-                            game::Action::Bet => {
-                                if let Some((_, dice_count, face_value)) = new_game.bets.last() {
-                                    render_state.selected_dice_count = *dice_count;
-                                    render_state.selected_face_value = *face_value;
+                // Check if enough time has passed since last AI action
+                let current_time = std::time::Instant::now();
+                let time_since_last_action = current_time.duration_since(last_ai_action_time);
+                
+                if time_since_last_action >= std::time::Duration::from_millis(1000) {
+                    let ai_action = ai_decide_action(&game);
+                    match take_action(&game, &ai_action) {
+                        Ok(new_game) => {
+                            match ai_action.action {
+                                game::Action::Bet => {
+                                    if let Some((_, dice_count, face_value)) = new_game.bets.last() {
+                                        render_state.selected_dice_count = *dice_count;
+                                        render_state.selected_face_value = *face_value;
+                                    }
+                                }
+                                game::Action::Call => {
+                                    render_state.selected_dice_count = 1;
+                                    render_state.selected_face_value = 1;
                                 }
                             }
-                            game::Action::Call => {
-                                render_state.selected_dice_count = 1;
-                                render_state.selected_face_value = 1;
-                            }
+                            game = new_game;
+                            last_ai_action_time = current_time; // Update the last action time
                         }
-                        game = new_game;
+                        Err(e) => {
+                            println!("AI error: {}", e);
+                            break;
+                        }
                     }
-                    Err(e) => {
-                        println!("AI error: {}", e);
-                        break;
-                    }
+                } else {
+                    // Not enough time has passed, break out of the AI loop to allow rendering
+                    break;
                 }
             }
         }
