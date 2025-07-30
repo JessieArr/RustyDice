@@ -16,7 +16,7 @@ impl RenderState {
     }
 }
 
-pub fn render_game(game: &Game, render_state: &mut RenderState) -> Option<PlayerAction> {
+pub fn render_game(game: &Game, render_state: &mut RenderState, dice_revealed: bool) -> Option<PlayerAction> {
     clear_background(WHITE);
 
     // Check if there's a winner
@@ -61,7 +61,7 @@ pub fn render_game(game: &Game, render_state: &mut RenderState) -> Option<Player
         }
     }
 
-    render_game_ui(game, render_state);
+    render_game_ui(game, render_state, dice_revealed);
     None
 }
 
@@ -95,7 +95,7 @@ fn render_winner_screen(game: &Game, winner_id: u8) {
     );
 }
 
-fn render_game_ui(game: &Game, render_state: &RenderState) {
+fn render_game_ui(game: &Game, render_state: &RenderState, dice_revealed: bool) {
     // Draw title
     draw_text(
         "Rusty Dice - 4 Players",
@@ -112,6 +112,21 @@ fn render_game_ui(game: &Game, render_state: &RenderState) {
         70.0,
         20.0,
         DARKGRAY,
+    );
+    
+    // Draw dice visibility status
+    let visibility_text = if dice_revealed {
+        "Dice Revealed - All players can see all dice"
+    } else {
+        "Dice Hidden - Only you can see your own dice"
+    };
+    let visibility_color = if dice_revealed { GREEN } else { ORANGE };
+    draw_text(
+        visibility_text,
+        screen_width() / 2.0 - 150.0,
+        95.0,
+        16.0,
+        visibility_color,
     );
 
     // Draw all players and their dice
@@ -155,8 +170,21 @@ fn render_game_ui(game: &Game, render_state: &RenderState) {
                 GRAY,
             );
             
-            // Draw dice dots
-            draw_dice_dots(dice_x, dice_y, game.player_dice[player][die]);
+            // Only show dice dots if:
+            // 1. It's the current player (player 0) - they can always see their own dice
+            // 2. Dice have been revealed after a call action
+            if player == 0 || dice_revealed {
+                draw_dice_dots(dice_x, dice_y, game.player_dice[player][die]);
+            } else {
+                // Draw question marks for hidden dice
+                draw_text(
+                    "?",
+                    dice_x - 8.0,
+                    dice_y + 8.0,
+                    24.0,
+                    BLACK,
+                );
+            }
         }
     }
 

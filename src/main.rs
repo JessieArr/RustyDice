@@ -29,10 +29,23 @@ async fn main() {
     
     // Track timing for AI actions
     let mut last_ai_action_time = std::time::Instant::now();
+    
+    // Track whether dice should be revealed (after a call action)
+    let mut dice_revealed = false;
+    let mut dice_revealed_time: Option<std::time::Instant> = None;
 
     loop {
+        // Check if dice should be hidden again after 3 seconds
+        if let Some(revealed_time) = dice_revealed_time {
+            let current_time = std::time::Instant::now();
+            if current_time.duration_since(revealed_time) >= std::time::Duration::from_secs(3) {
+                dice_revealed = false;
+                dice_revealed_time = None;
+            }
+        }
+        
         // Always render the game
-        let action = render_game(&game, &mut render_state);
+        let action = render_game(&game, &mut render_state, dice_revealed);
 
         // Only allow human (player 0) to act when it's their turn and the game is not over
         if game.current_player == 0 && game.winner.is_none() {
@@ -49,6 +62,8 @@ async fn main() {
                             game::Action::Call => {
                                 render_state.selected_dice_count = 1;
                                 render_state.selected_face_value = 1;
+                                dice_revealed = true; // Reveal dice after a call
+                                dice_revealed_time = Some(std::time::Instant::now()); // Start timing
                             }
                         }
                         game = new_game;
@@ -77,6 +92,8 @@ async fn main() {
                                 game::Action::Call => {
                                     render_state.selected_dice_count = 1;
                                     render_state.selected_face_value = 1;
+                                    dice_revealed = true; // Reveal dice after a call
+                                    dice_revealed_time = Some(std::time::Instant::now()); // Start timing
                                 }
                             }
                             game = new_game;
@@ -100,6 +117,8 @@ async fn main() {
             game = Game::new();
             roll_all_dice(&mut game);
             render_state = RenderState::new();
+            dice_revealed = false; // Reset dice visibility
+            dice_revealed_time = None; // Reset timing
         }
 
         next_frame().await;
